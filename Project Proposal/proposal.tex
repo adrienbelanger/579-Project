@@ -35,7 +35,7 @@
 
 \subsubsection*{Project Information}
 
-Proposed Title: \_\_\_\_
+Proposed Title: Upgrading late exploitation in PPO with Replay Buffers, LSTMs, and Parameter Decay
 
 Authors: Eric Sun (), Sumukh Patel (), Adrien Bélanger (261118168)
 
@@ -43,11 +43,11 @@ Authors: Eric Sun (), Sumukh Patel (), Adrien Bélanger (261118168)
 Paper \cite{PPOPaper}
 % --------- Work in progress ---------
 Proximal Policy Optimization algorithms, which were introduced by Schulman et al. from OpenAI in 2017, are a mainstream approach for policy improvement. \cite{PPOPaper}
-They are appreciated for their speed, efficiency and simplicity [cite]. 
+They are appreciated for their speed, efficiency and simplicity \cite{PPOPaper}. 
 However, when compared to other algorithms, it fails to fully exploit in the last episodes, 
 a flaw that is illustrated in table 2 of the Atari Benchmark of the original paper, where it fails
 to beat the \textit{Actor Critic with Experience Replay} agent. \cite{PPOPaper,ACERPaper} \ This project aims to remedy this lapse in performance by implementing the following three approaches (both simultaneously and on their own): decaying clipping and learning rate parameters, adding a replay buffer, switching the MLP framework used in the paper for an LSTM-based approach for better capturing long term dependencies.
-This is particularly interesting because PPO is a popular approach for the problem, and any sizable improvement could mean a significant boost in a multitude of problems that use PPOs, such as (example 1) and (example 2). [cite 1] [cite 2]
+This is particularly interesting because PPO is a popular approach for the problem, and any sizable improvement could mean a significant boost in a multitude of problems that use PPOs, such as in RLHF language models and complex video game benchmarks. \cite{RLHF,dota}
 % \--------- Work in progress ---------
 \subsubsection*{Methods}
 
