@@ -55,6 +55,8 @@ This is particularly interesting because PPO is a popular approach for the probl
 % We should maybe do an analysis of the efficiency before and after our approaches? - Adrien
 
 
+We implement Proximal Policy Optimization (PPO) following \cite{PPOPaper} and evaluate it on a subset of Atari 2600 games from the Arcade Learning Environment, focusing on environments where PPO underperforms in final performance (e.g., ChopperCommand, FishingDerby, Centipede, Breakout, MsPacman). As baselines, we use the standard PPO implementation and reported results from ACER \cite{ACERPaper}. We study three modifications aimed at improving late-stage performance: (1) annealing the clipping parameter and learning rate, (2) augmenting PPO with a replay buffer, and (3) replacing the MLP policy/value networks with an LSTM-based architecture. Each variant is evaluated independently and in combination, using the average episodic reward over the last 100 episodes as the primary metric, alongside learning curves over training frames. This experimental design enables controlled ablations while maintaining feasible computational cost.
+
 
 % -------------------------
 \vfill \newpage
