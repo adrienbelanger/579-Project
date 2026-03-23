@@ -1,6 +1,6 @@
 import gymnasium as gym
 import numpy as np
-
+from model import Model
 '''
 Here is where we can declare each of our agents.
 I've set up a random agent for good measure.
@@ -32,13 +32,20 @@ class Agent:
         """select action depend on our policy. as usual actions are ints in gym"""
         return 0
     
-class RandomAgent:
+class RandomAgent(Agent):
     '''
     Random actions, mostly for testing
     '''
-    def __init__(self, path_to_model):
-        self.model = load_model(path_to_model)
 
     def select_action(self, obs: np.ndarray) -> int:
         """return random action"""
         return self.action_space.sample()
+    
+
+class RLAgent(Agent):
+
+    def __init__(self, model: Model):
+        self.model = model
+
+
+class PPO_Agent(RLAgent):
