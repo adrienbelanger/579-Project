@@ -17,7 +17,7 @@ class Game:
     '''
     def __init__(self, name: str):
         if name not in VALID_GAMES:
-            raise ValueError()
+            raise ValueError(f"{name} not a valid game. Check VALID_GAMES")
         self.name = name
         self.env_id = f"ALE/{self.name}-v5"
 
