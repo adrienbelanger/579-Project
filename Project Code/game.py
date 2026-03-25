@@ -22,3 +22,14 @@ class Game:
         self.env_id = f"ALE/{self.name}-v5"
 
     
+def make_games(games: list[str]) -> list[Game]:
+    '''
+    Make game objects from a list of games.
+
+    Args:
+        games: list of game names (strings) to create Game objects from
+    '''
+    list = []
+    for game in games:
+        list.append(Game(game))
+    return list
