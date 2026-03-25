@@ -1,6 +1,6 @@
 import gymnasium as gym
 import numpy as np
-from model import Model
+from model import Model, PPOModel
 '''
 Here is where we can declare each of our agents.
 I've set up a random agent for good measure.
@@ -42,10 +42,9 @@ class RandomAgent(Agent):
         return self.action_space.sample()
     
 
-class RLAgent(Agent):
+class PolicyAgent(Agent):
 
     def __init__(self, model: Model):
         self.model = model
 
 
-class PPO_Agent(RLAgent):
