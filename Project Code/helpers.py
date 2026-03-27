@@ -1,7 +1,7 @@
 import gymnasium as gym
 from gymnasium.wrappers import (ResizeObservation,GrayscaleObservation,FrameStackObservation,MaxAndSkipObservation,)
 import numpy as np
-from agent import Agent
+from agent import Agent, PolicyAgent
 from game import Game, VALID_GAMES, make_games
 import pandas as pd
 from dataclasses import dataclass # so we can do game class so it's easier for our plotting
@@ -62,7 +62,7 @@ def make_env(game: Game,render_mode: Literal["human", "rgb_array", None] = None)
 
     return env
 
-def run_game(game: Game, render_mode: Literal["human", "rgb_array", None],agent: Agent,n_eps: int,max_steps: int) -> list[frameResult]: 
+def run_game(game: Game, render_mode: Literal["human", "rgb_array", None],agent: Agent,n_eps: int,max_episode_steps: int) -> list[frameResult]: 
     """
     Run n episodes of the game with our agent and return the average reward at each frame.
     
@@ -88,7 +88,7 @@ def run_game(game: Game, render_mode: Literal["human", "rgb_array", None],agent:
         done = False
         cur_step = 0
 
-        while not done and cur_step < max_steps:
+        while not done and cur_step < max_episode_steps:
             action = agent.select_action(cur_observation)
             cur_observation, cur_r, done_term, done_trunc, _ = env.step(action)
             
@@ -132,14 +132,18 @@ def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> list[Gam
 
     game_results = []
     for a,agent in enumerate(agents):
-        print(f"Using agent {agent} - {a}/{len(agents)}")
+        print(f"Using agent {agent.__class__.__name__} - {a+1}/{len(agents)}")
         for game in games:
-            print(f"  Running game {game.name} - ") #TODO: addgame length
+            if (isinstance(agent, PolicyAgent)):
+                # then we need to train
+                print(f"  Training agent {agent.__class__.__name__} on game {game.name}...")
+                agent.train(game)
+            print(f"  Evaluating agent {agent.__class__.__name__} on game {game.name}...") #TODO: addgame length
             seed_results = []
             for i,seed in enumerate(bench_config.seeds):
-                print(f"     Seed {seed} - {i}/{len(bench_config.seeds)}")
+                print(f"     Seed {seed} - {i+1}/{len(bench_config.seeds)}")
                 random.seed(seed)
-                game_frames = run_game(game,bench_config.render_mode,agent,bench_config.episodes,bench_config.max_steps)
+                game_frames = run_game(game,bench_config.render_mode,agent,bench_config.episodes,bench_config.max_episode_steps)
 
                 seed_result = seedResult(seed,game_frames)
                 seed_results.append(seed_result)
@@ -148,8 +152,6 @@ def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> list[Gam
             game_results.append(game_result)
 
     return game_results
-
-
 
 def plot_results(game_results: list[GameResult])-> None:
     """
