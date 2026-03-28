@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Any
 
 import gymnasium as gym
@@ -12,6 +13,15 @@ import config
 
 class Model:
     """Base model class for project models."""
+
+
+@dataclass(frozen=True)
+class EpisodePoint:
+    """Single completed episode logged during PPO training."""
+
+    total_timesteps: int
+    game_frames: int
+    episode_return: float
 
 
 class ActorCritic(Model, nn.Module):
@@ -74,6 +84,7 @@ class PPOModel(Model):
 
     def __init__(self, action_dim: int) -> None:
         self.cfg = config.PPOConfig() # use default config from config.py.
+        self.env_cfg = config.EnvConfig()
         self.network = ActorCritic(action_dim=action_dim) # uses the action dim from the game it has to train on.
         
         self.optimizer = torch.optim.Adam( # paper uses adam optimizer. config has the correct parameter
@@ -82,42 +93,59 @@ class PPOModel(Model):
             eps=self.cfg.adam_eps,
         )
         self._trained = False # used as check for training
-        if self.cfg.seed is not None:
-            torch.manual_seed(self.cfg.seed)
-            np.random.seed(self.cfg.seed)
 
     @property
     def is_trained(self) -> bool:
         '''Check if model is trained'''
         return self._trained
 
-    def train(self, env: gym.vector.VectorEnv) -> None:
+
+    def _current_value_coeff(self, update_i: int, updates: int) -> float:
+        return float(self.cfg.val_func_coeff)
+
+    def train(self, env: gym.vector.VectorEnv, seed: int) -> list[EpisodePoint]:
 
         N, T = self.cfg.actors, self.cfg.horizon
         updates = self.cfg.total_timesteps // (N * T)
+        if updates <= 0:
+            raise ValueError(f"PPOConfig.total_timesteps must be more than actors * horizon (here higher than {self.cfg.actors * self.cfg.horizon}).") # added since we gt 0 trainign before
 
-        obs, _ = env.reset(seed=self.cfg.seed)
+
+        run_seed = seed
+
+        obs, _ = env.reset(seed=run_seed)
+        episode_returns = np.zeros(N, dtype=np.float32)
+        total_timesteps = 0
+        episode_points: list[EpisodePoint] = []
         self.network.train()
-        for update_i in tqdm(range(updates), desc="    Training", unit="update"):
+        for update_i in tqdm(range(updates), desc="      Training", unit="update"):
             alpha = 1.0 - (update_i / updates)
             lr = self.cfg.learning_rate * alpha if self.cfg.anneal_learning_rate else self.cfg.learning_rate # if we don't want to anneal we can retest
             clip = self.cfg.clipping * alpha if self.cfg.anneal_clipping else self.cfg.clipping
+            value_coeff = self._current_value_coeff(update_i, updates)
             for group in self.optimizer.param_groups:
                 group["lr"] = lr
 
-            O, A, R, D, LP, V, obs = self._rollout(env, obs)
+            O, A, R, D, LP, V, obs, episode_returns, total_timesteps, new_points = self._rollout(
+                env,
+                obs,
+                episode_returns,
+                total_timesteps,
+            )
+            episode_points.extend(new_points)
             with torch.no_grad():
                 _, next_v = self.network(obs)
             adv, ret = self._gae(R, D, V, next_v)
-            self._update(O, A, LP, adv, ret, clip)
+            self._update(O, A, LP, adv, ret, clip, value_coeff)
 
         self.network.eval()
         self._trained = True
+        return episode_points
 
-    def _rollout(
-        self, env: gym.vector.VectorEnv, obs: np.ndarray
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, np.ndarray]:
+    def _rollout( self, env: gym.vector.VectorEnv, obs: np.ndarray, episode_returns: np.ndarray, total_timesteps: int,) -> tuple:
         O, A, R, D, LP, V = [], [], [], [], [], []
+        episode_points: list[EpisodePoint] = []
+        frames_per_env_step = self.env_cfg.frameskip * self.env_cfg.MaxAndSkipObservation
         for _ in range(self.cfg.horizon):
             with torch.no_grad():
                 logits, values = self.network(obs)
@@ -125,6 +153,20 @@ class PPOModel(Model):
             actions = dist.sample()
             next_obs, rewards, terminated, truncated, _ = env.step(actions.cpu().numpy())
             dones = np.logical_or(terminated, truncated)
+            rewards_np = np.asarray(rewards, dtype=np.float32)
+            episode_returns += rewards_np
+            total_timesteps += int(rewards_np.shape[0])
+
+            for actor_idx, done in enumerate(dones):
+                if done:
+                    episode_points.append(
+                        EpisodePoint(
+                            total_timesteps=total_timesteps,
+                            game_frames=total_timesteps * frames_per_env_step,
+                            episode_return=float(episode_returns[actor_idx]),
+                        )
+                    )
+                    episode_returns[actor_idx] = 0.0
 
             O.append(self.network.obs_to_tensor(obs))
             A.append(actions)
@@ -142,15 +184,12 @@ class PPOModel(Model):
             torch.stack(LP),
             torch.stack(V),
             obs,
+            episode_returns,
+            total_timesteps,
+            episode_points,
         )
 
-    def _gae(
-        self,
-        rewards: torch.Tensor,
-        dones: torch.Tensor,
-        values: torch.Tensor,
-        next_values: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def _gae( self,rewards: torch.Tensor,dones: torch.Tensor,values: torch.Tensor,next_values: torch.Tensor,) -> tuple[torch.Tensor, torch.Tensor]:
         advantages = torch.zeros_like(rewards)
         gae = torch.zeros(rewards.shape[1], dtype=torch.float32)
         next_v = next_values
@@ -171,6 +210,7 @@ class PPOModel(Model):
         advantages: torch.Tensor,
         returns: torch.Tensor,
         clip: float,
+        value_coeff: float,
     ) -> None:
         obs = observations.flatten(0, 1)
         act = actions.flatten()
@@ -193,7 +233,7 @@ class PPOModel(Model):
                 p_loss = -torch.min(ratio * adv[idx], ratio_clip * adv[idx]).mean()
                 v_loss = (values - ret[idx]).pow(2).mean()
                 e_bonus = dist.entropy().mean()
-                loss = p_loss + self.cfg.val_func_coeff * v_loss - self.cfg.entropy_coeff * e_bonus
+                loss = p_loss + value_coeff * v_loss - self.cfg.entropy_coeff * e_bonus
 
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -206,3 +246,11 @@ class PPOModel(Model):
             logits, _ = self.network(observation)
             action = Categorical(logits=logits).sample() if stochastic else torch.argmax(logits, dim=-1)
         return int(action.item()) if action.numel() == 1 else action.cpu().numpy()
+
+
+class PPOModel_VF_Annealing(PPOModel):
+    def _current_value_coeff(self, update_i: int, updates: int) -> float:
+        initial = config.PPOConfig_VF_Annealing.initial_val_coeff
+        final = config.PPOConfig_VF_Annealing.final_val_coeff
+        alpha = 1.0 - (update_i / updates)
+        return float(final + (initial - final) * alpha)

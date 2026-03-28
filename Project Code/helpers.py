@@ -3,6 +3,7 @@ from gymnasium.wrappers import (ResizeObservation,GrayscaleObservation,FrameStac
 import numpy as np
 from agent import Agent, PolicyAgent
 from game import Game, VALID_GAMES, make_games
+from model import EpisodePoint
 import pandas as pd
 from dataclasses import dataclass # so we can do game class so it's easier for our plotting
 from typing import Literal, Tuple
@@ -26,7 +27,7 @@ class frameResult:
 @dataclass
 class seedResult:
     seed: int
-    frame_rewards: list[frameResult]
+    episode_points: list[EpisodePoint]
     
 @dataclass
 class GameResult:
@@ -70,8 +71,8 @@ def run_game(game: Game, render_mode: Literal["human", "rgb_array", None],agent:
         game: the game to run
         render_mode: rendering mode during execution
         agent: agent from our Agent class
-        n_eps: number of episodes to run for. PPO ran for 3
-        max_steps: max steps to run for if game is not won/loss yet
+        n_eps: number of evaluation episodes to run
+        max_episode_steps: max steps to run for if game is not won/loss yet
         
     Returns:
         list of frameResult objects where reward is the average reward at that frame across all episodes
@@ -115,12 +116,12 @@ def run_game(game: Game, render_mode: Literal["human", "rgb_array", None],agent:
 
 
 
-def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> list[GameResult]:
+def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> None:
     '''
     Run the list of games with the PPO benchmark parameters.
 
     Args:
-        agent: agent to be evaluated on the list of games
+        agent: agent to be trained on the list of games
         games_list: list of games to be run, or None for full list of games
     '''
     if games_list == None:
@@ -132,30 +133,38 @@ def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> list[Gam
 
     game_results = []
     for a,agent in enumerate(agents):
+        if not isinstance(agent, PolicyAgent):
+            raise ValueError( # had to be changed since the training is being evaluated (see figure 6)
+                "run_benchmark only supports PolicyAgent inputs. "
+            )
         print(f"Using agent {agent.__class__.__name__} - {a+1}/{len(agents)}")
-        for game in games:
-            if (isinstance(agent, PolicyAgent)):
-                # then we need to train
-                print(f"  Training agent {agent.__class__.__name__} on game {game.name}...")
-                agent.train(game)
-            print(f"  Evaluating agent {agent.__class__.__name__} on game {game.name}...") #TODO: addgame length
+        for ge,game in enumerate(games):
+            print(f"  On game {game.name}, {ge+1}/{len(games)}")
             seed_results = []
             for i,seed in enumerate(bench_config.seeds):
-                print(f"     Seed {seed} - {i+1}/{len(bench_config.seeds)}")
+                print(f"    Using seed {seed} - {i+1}/{len(bench_config.seeds)}")
                 random.seed(seed)
-                game_frames = run_game(game,bench_config.render_mode,agent,bench_config.episodes,bench_config.max_episode_steps)
+                np.random.seed(seed)
+                try:
+                    run_agent = agent.__class__() #type:ignore # we recreate an agent for each seed, of the same type that was inputted. TODO: Could be better modelled? 
+                except TypeError as exc:
+                    raise TypeError(
+                        f"{agent.__class__.__name__} must support a zero-argument constructor to be used in run_benchmark."
+                    ) from exc
 
-                seed_result = seedResult(seed,game_frames)
+                episode_points = run_agent.train(game, seed=seed)
+                seed_result = seedResult(seed, episode_points)
                 seed_results.append(seed_result)
             
             game_result = GameResult(agent,game,seed_results)
             game_results.append(game_result)
 
-    return game_results
+    plot_results(game_results)
+    plot_final_scores_table(game_results)
 
 def plot_results(game_results: list[GameResult])-> None:
     """
-    Plot like in the PPO paper so we can compare with their results. One color per agent, one line per seed.
+    Plot PPO learning curves. One color per agent, one line per seed.
     
     Args:
         game_results: List of GameResult objects potentially from multiple agents
@@ -200,15 +209,16 @@ def plot_results(game_results: list[GameResult])-> None:
             color = agent_colors[agent_name]
             
             for seed_result in game_result.seed_results:
-                frame_rewards = seed_result.frame_rewards
-                frames = [frame.t for frame in frame_rewards]
-                rewards = [frame.reward for frame in frame_rewards]
-                
-                # Compute cumulative rewards
-                cumulative_rewards = np.cumsum(rewards)
-                ax.plot(frames, cumulative_rewards, color=color, alpha=0.7, linewidth=1.5)
+                episode_points = seed_result.episode_points
+                if not episode_points:
+                    continue
+                game_frames = [point.game_frames for point in episode_points]
+                episode_returns = [point.episode_return for point in episode_points]
+                ax.plot(game_frames, episode_returns, color=color, alpha=0.7, linewidth=1.5)
         
         ax.set_title(game_name, fontsize=12)
+        ax.set_xlabel("Game Frames")
+        ax.set_ylabel("Episode Return")
         ax.grid()
     
     # Remove extra subplots
@@ -219,5 +229,58 @@ def plot_results(game_results: list[GameResult])-> None:
     legend_elements = [Patch(facecolor=color, label=agent) for agent, color in agent_colors.items()]
     fig.legend(handles=legend_elements, loc='upper right', fontsize=10)
     
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_final_scores_table(game_results: list[GameResult]) -> None:
+    """
+    Plot a table of final scores, like table 6 in the original paper
+    """
+    rows_by_game: dict[str, dict[str, float]] = {}
+    agent_names: list[str] = []
+
+    for result in game_results:
+        # get each game name and agent name.
+        game_name = result.game.name
+        agent_name = result.agent.__class__.__name__
+        if agent_name not in agent_names:
+            agent_names.append(agent_name)
+
+        per_seed_scores = []
+        for seed_result in result.seed_results:
+            episode_returns = [point.episode_return for point in seed_result.episode_points]
+            if episode_returns:
+                per_seed_scores.append(float(np.mean(episode_returns[-100:])))
+
+        mean_final_score = float(np.mean(per_seed_scores)) if per_seed_scores else np.nan
+        rows_by_game.setdefault(game_name, {})[agent_name] = mean_final_score
+
+    table_rows = []
+    for game_name, agent_scores in rows_by_game.items():
+        row = {"Game": game_name}
+        for agent_name in agent_names:
+            score = agent_scores.get(agent_name, np.nan)
+            row[agent_name] = "" if pd.isna(score) else f"{score:.1f}"
+        table_rows.append(row)
+
+    table_df = pd.DataFrame(table_rows, columns=["Game", *agent_names])
+
+    fig_height = max(2.5, 0.35 * (len(table_df) + 1))
+    fig_width = max(6.0, 2.5 + 1.6 * len(table_df.columns))
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+    ax.axis("off")
+    ax.set_title("Mean Final Scores (Last 100 Episodes)", fontsize=12, pad=12)
+
+    table = ax.table(
+        cellText=table_df.values, # type:ignore # random typing errors
+        colLabels=table_df.columns, #type:ignore
+        loc="center",
+        cellLoc="center",
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.2)
+
     plt.tight_layout()
     plt.show()

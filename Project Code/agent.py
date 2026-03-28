@@ -5,10 +5,10 @@ import numpy as np
 
 import config
 from game import Game
-from model import Model, PPOModel
+from model import EpisodePoint, Model, PPOModel, PPOModel_VF_Annealing
 '''
 Here is where we can declare each of our agents.
-I've set up a random agent for good measure.
+I've set up a random agent for good measure. (which is now deprecated)
 
 The original paper used the following hyperparamaters (copied from the paper)
     Hyperparameter          Value
@@ -39,7 +39,7 @@ class Agent:
     
 class RandomAgent(Agent):
     '''
-    Random actions, mostly for testing
+    Random actions, mostly for testing. Deprecated for benchmark.
     '''
 
     def select_action(self, obs: np.ndarray) -> int: # observation doesn't matter here, but still take as arg so benchmark runs
@@ -53,10 +53,10 @@ class PolicyAgent(Agent):
     def __init__(self, model: Model):
         pass
 
-    def select_action(self, obs: np.ndarray) -> int:
-        return 0
+    def select_action(self, obs: np.ndarray) -> int: # type: ignore
+        pass
     
-    def train(self, game: Game, render_mode: Literal["human", "rgb_array", None] = None) -> None:
+    def train(self, game: Game, seed: int | None = None) -> list[EpisodePoint]: # type:ignore
         pass
 
 
@@ -82,7 +82,7 @@ class PPOAgent(PolicyAgent):
         '''Check which game we have trained on. Returns the name of the game as a string or None if not trained yet.'''
         return self._trained_game
 
-    def train(self, game: Game) -> None:
+    def train(self, game: Game, seed: int) -> list[EpisodePoint]:
         '''
         Trian the PPO agent on a specific game.
         Args:
@@ -99,14 +99,18 @@ class PPOAgent(PolicyAgent):
 
         vector_env = gym.vector.AsyncVectorEnv([build_env for _ in range(self.ppo_cfg.actors)])
         try:
-            action_dim = int(vector_env.single_action_space.n)
-            self.model = PPOModel(action_dim=action_dim)
-            self.model.train(vector_env)
+            action_dim = int(vector_env.single_action_space.n) # type:ignore
+            self.model = self._build_model(action_dim)
+            episode_points = self.model.train(vector_env, seed=seed)
             self._trained = True
             self._trained_game = game.name
             self.action_space = vector_env.single_action_space
+            return episode_points
         finally:
             vector_env.close()
+
+    def _build_model(self, action_dim: int) -> PPOModel:
+        return PPOModel(action_dim=action_dim)
 
     def reset(self, env: gym.Env) -> None:
         super().reset(env)
@@ -119,3 +123,14 @@ class PPOAgent(PolicyAgent):
             )
         action = self.model.act(obs, stochastic=self.stochastic_eval) # if stochastic, then we select the 
         return int(action)
+
+class PPOAgent_VF_Annealing(PPOAgent):
+    def __init__(self) -> None:
+        self.ppo_cfg = config.PPOConfig_VF_Annealing()
+        self.stochastic_eval = True # like in the paper, 
+        self.model: PPOModel_VF_Annealing | None = None
+        self._trained = False
+        self._trained_game: str | None = None
+
+    def _build_model(self, action_dim: int) -> PPOModel_VF_Annealing:
+        return PPOModel_VF_Annealing(action_dim=action_dim)

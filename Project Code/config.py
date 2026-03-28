@@ -32,10 +32,10 @@ class ActorCriticConfig:
 
 @dataclass(frozen=True)
 class BenchmarkConfig:
-    seeds= (7, 4002, 451)
-    render_mode= None
-    episodes= 3
-    max_episode_steps = 10_000_000  # cap for evaluation, after this we have enough score
+    seeds= (7, 4002, 451)  # independent training seeds for the paper-style benchmark
+    render_mode= None  # manual evaluation only
+    episodes= 3  # manual evaluation only
+    max_episode_steps = 10_000_000  # manual evaluation cap, not part of PPO paper reporting
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,13 @@ class PPOConfig:
     anneal_clipping = True
     val_func_coeff = 1.0
     entropy_coeff = 0.01
-    total_timesteps = 10_000_000  # supposed to be 10M timesteps with frame skip 4.
+    total_timesteps = 100000  # supposed to be 10M timesteps with frame skip 4.
     max_grad_norm = 0.5
     seed = None
     actor_critic: ActorCriticConfig = field(default_factory=ActorCriticConfig)
+
+@dataclass(frozen=True)
+class PPOConfig_VF_Annealing(PPOConfig):
+    anneal_value_coeff: bool = True
+    initial_val_coeff: float = 1.0
+    final_val_coeff: float = 0.1
