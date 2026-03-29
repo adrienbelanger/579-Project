@@ -10,7 +10,8 @@ from typing import Literal, Tuple
 import random
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
-
+import multiprocessing.pool
+import os
 import config
 
 try: # so that when we run benchmark we don't get publicity from ale_py: by printing: A.L.E: Arcade Learning Environment (version 0.11.2+ecc1138) [Powered by Stella]
@@ -113,17 +114,32 @@ def run_game(game: Game, render_mode: Literal["human", "rgb_array", None],agent:
     
     return avg_rewards_per_frame
 
+class NoDaemonProcess(multiprocessing.Process):
+    def __init__(self, ctx=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @property
+    def daemon(self):
+        return False
+
+    @daemon.setter
+    def daemon(self, value):
+        pass
+
+class NoDaemonPool(multiprocessing.pool.Pool):
+    Process = NoDaemonProcess
+
+def _train_one(args: tuple) -> seedResult:
+    agent_cls, game, seed = args
+    random.seed(seed)
+    np.random.seed(seed)
+    run_agent = agent_cls()
+    episode_points = run_agent.train(game, seed=seed)
+    return seedResult(seed, episode_points)
 
 
 
 def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> None:
-    '''
-    Run the list of games with the PPO benchmark parameters.
-
-    Args:
-        agent: agent to be trained on the list of games
-        games_list: list of games to be run, or None for full list of games
-    '''
     if games_list == None:
         games = make_games(VALID_GAMES)
     else:
@@ -132,36 +148,24 @@ def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> None:
     bench_config = config.BenchmarkConfig()
 
     game_results = []
-    for a,agent in enumerate(agents):
+    for a, agent in enumerate(agents):
         if not isinstance(agent, PolicyAgent):
-            raise ValueError( # had to be changed since the training is being evaluated (see figure 6)
-                "run_benchmark only supports PolicyAgent inputs. "
-            )
+            raise ValueError("run_benchmark only supports PolicyAgent inputs. ")
         print(f"Using agent {agent.__class__.__name__} - {a+1}/{len(agents)}")
-        for ge,game in enumerate(games):
+        for ge, game in enumerate(games):
             print(f"  On game {game.name}, {ge+1}/{len(games)}")
-            seed_results = []
-            for i,seed in enumerate(bench_config.seeds):
-                print(f"    Using seed {seed} - {i+1}/{len(bench_config.seeds)}")
-                random.seed(seed)
-                np.random.seed(seed)
-                try:
-                    run_agent = agent.__class__() #type:ignore # we recreate an agent for each seed, of the same type that was inputted. TODO: Could be better modelled? 
-                except TypeError as exc:
-                    raise TypeError(
-                        f"{agent.__class__.__name__} must support a zero-argument constructor to be used in run_benchmark."
-                    ) from exc
 
-                episode_points = run_agent.train(game, seed=seed)
-                seed_result = seedResult(seed, episode_points)
-                seed_results.append(seed_result)
-            
-            game_result = GameResult(agent,game,seed_results)
+            tasks = [(agent.__class__, game, seed) for seed in bench_config.seeds]
+            ppo_cfg = config.PPOConfig()
+            n_workers = min(len(bench_config.seeds), (os.cpu_count() or 1) // ppo_cfg.actors)
+            with NoDaemonPool(processes=max(1, n_workers)) as pool:
+                seed_results = pool.map(_train_one, tasks)
+
+            game_result = GameResult(agent, game, seed_results)
             game_results.append(game_result)
 
     plot_results(game_results)
     plot_final_scores_table(game_results)
-
 def plot_results(game_results: list[GameResult])-> None:
     """
     Plot PPO learning curves. One color per agent, one line per seed.
