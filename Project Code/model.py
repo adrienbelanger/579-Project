@@ -85,7 +85,11 @@ class PPOModel(Model):
     def __init__(self, action_dim: int) -> None:
         self.cfg = config.PPOConfig() # use default config from config.py.
         self.env_cfg = config.EnvConfig()
-        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else
+            "mps"  if torch.backends.mps.is_available() else
+            "cpu"
+        )
         self.network = ActorCritic(action_dim=action_dim).to(self.device) # uses the action dim from the game it has to train on.
         
         self.optimizer = torch.optim.Adam( # paper uses adam optimizer. config has the correct parameter
