@@ -157,7 +157,7 @@ def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> None:
 
             tasks = [(agent.__class__, game, seed) for seed in bench_config.seeds]
             ppo_cfg = config.PPOConfig()
-            n_workers = min(len(bench_config.seeds), (os.cpu_count() or 1) // ppo_cfg.actors)
+            n_workers = min(len(bench_config.seeds), (os.cpu_count() or 1) // ppo_cfg.actors) # depending onhow many cpu cores, ou might not be able to parallelize.. Colab??
             with NoDaemonPool(processes=max(1, n_workers)) as pool:
                 seed_results = pool.map(_train_one, tasks)
 
