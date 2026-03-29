@@ -54,7 +54,7 @@ class PPOConfig:
     anneal_clipping = True
     val_func_coeff = 1.0
     entropy_coeff = 0.01
-    total_timesteps = 100000  # supposed to be 10M timesteps with frame skip 4.
+    total_timesteps = 10000000  # supposed to be 10M timesteps with frame skip 4.
     max_grad_norm = 0.5
     seed = None
     actor_critic: ActorCriticConfig = field(default_factory=ActorCriticConfig)

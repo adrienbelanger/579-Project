@@ -85,7 +85,8 @@ class PPOModel(Model):
     def __init__(self, action_dim: int) -> None:
         self.cfg = config.PPOConfig() # use default config from config.py.
         self.env_cfg = config.EnvConfig()
-        self.network = ActorCritic(action_dim=action_dim) # uses the action dim from the game it has to train on.
+        self.device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+        self.network = ActorCritic(action_dim=action_dim).to(self.device) # uses the action dim from the game it has to train on.
         
         self.optimizer = torch.optim.Adam( # paper uses adam optimizer. config has the correct parameter
             self.network.parameters(),
@@ -170,8 +171,8 @@ class PPOModel(Model):
 
             O.append(self.network.obs_to_tensor(obs))
             A.append(actions)
-            R.append(torch.as_tensor(rewards, dtype=torch.float32))
-            D.append(torch.as_tensor(dones, dtype=torch.float32))
+            R.append(torch.as_tensor(rewards, dtype=torch.float32).to(self.device))
+            D.append(torch.as_tensor(dones,   dtype=torch.float32).to(self.device))
             LP.append(dist.log_prob(actions))
             V.append(values)
             obs = next_obs
@@ -191,7 +192,7 @@ class PPOModel(Model):
 
     def _gae( self,rewards: torch.Tensor,dones: torch.Tensor,values: torch.Tensor,next_values: torch.Tensor,) -> tuple[torch.Tensor, torch.Tensor]:
         advantages = torch.zeros_like(rewards)
-        gae = torch.zeros(rewards.shape[1], dtype=torch.float32)
+        gae = torch.zeros(rewards.shape[1], dtype=torch.float32, device=rewards.device)
         next_v = next_values
         for t in reversed(range(self.cfg.horizon)):
             non_terminal = 1.0 - dones[t]
@@ -217,6 +218,8 @@ class PPOModel(Model):
         old_lp = old_log_probs.flatten()
         adv = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         ret = returns
+        adv = adv.to(self.device)
+        ret = ret.to(self.device)
         batch_size = obs.shape[0]
 
         for epo in range(self.cfg.epochs):
