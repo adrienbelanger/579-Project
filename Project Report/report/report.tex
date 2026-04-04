@@ -1,0 +1,94 @@
+\documentclass{article}
+
+% Use the camera-ready NeurIPS layout for the course report.
+% Switch to [preprint] if you prefer a draft footer while writing.
+\usepackage[final]{neurips_2024}
+\makeatletter
+\renewcommand{\@noticestring}{COMP 579 Final Project Report}
+\makeatother
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{nicefrac}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{csquotes}
+
+\graphicspath{{figures/}}
+
+\title{Upgrading Late Exploitation in PPO with Replay Buffers, LSTMs, and Parameter Decay}
+
+\author{%
+  Eric Sun \\
+  McGill University - 261103545
+  \And
+  Sumukh Patel \\
+  McGill University - 261276753
+  \And
+  Adrien B\'elanger  \\
+  McGill University - 261118168
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This project aims to reimplement the paper that introduced Proximal Policy Algorithms (PPO) and target three different modifications aimed at improving late-game performance on the Atari57 benchmark. \cite{PPOPaper}
+The first change is to introduce value function annealing to the algorithm, as it has been shown to do better exploitation in late-game usage [CITE]. The second is to introduce a Long Short Term Memory (LSTM) model to replace the MLP architecture of the original paper and better leverage the long-term dependencies. [CITE]
+Thirdly, we introduce a replay buffer to try and improve the experience usage and gathering for improving game results in the last episodes. [CITE]
+\end{abstract}
+
+\section{Introduction}
+
+
+\section{Background}
+
+
+\section{Methodology}
+
+\subsection{Base PPO}
+
+\subsection{PPO with value-function annealing}
+
+\subsection{PPO with an LSTM architecture}
+
+\subsection{PPO with a replay buffer}
+
+
+
+\section{Experimental Results}
+
+
+\section{Conclusion and Future Work}
+
+
+\section{Contributions and Acknowledgements}
+
+\paragraph{Contributions}
+The code was separated in three key parts:
+\begin{itemize}
+  \item Adrien took care of the benchmarking, base PPO implementation and value-function annealing implementation
+  \item Eric took care of the LSTM agent and running the benchmarks
+  \item Sumukh took care of implementing the replay buffer agent
+\end{itemize}
+
+The report was a collaborative effort.
+
+\paragraph{Acknowledgements}
+
+
+\vfill \newpage
+
+\bibliographystyle{plainnat}
+\bibliography{bibliography}
+
+\end{document} 
