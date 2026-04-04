@@ -4,7 +4,7 @@
 % Switch to [preprint] if you prefer a draft footer while writing.
 \usepackage[final]{neurips_2024}
 \makeatletter
-\renewcommand{\@noticestring}{COMP 579 Final Project Report}
+\renewcommand{\@noticestring}{}
 \makeatother
 
 \usepackage[utf8]{inputenc}
@@ -42,9 +42,15 @@
 \maketitle
 
 \begin{abstract}
-This project aims to reimplement the paper that introduced Proximal Policy Algorithms (PPO) and target three different modifications aimed at improving late-game performance on the Atari57 benchmark. \cite{PPOPaper}
-The first change is to introduce value function annealing to the algorithm, as it has been shown to do better exploitation in late-game usage [CITE]. The second is to introduce a Long Short Term Memory (LSTM) model to replace the MLP architecture of the original paper and better leverage the long-term dependencies. [CITE]
-Thirdly, we introduce a replay buffer to try and improve the experience usage and gathering for improving game results in the last episodes. [CITE]
+This project aims to reimplement the paper that introduced Proximal Policy Algorithms 
+(PPO) and target three different modifications aimed at improving late-game performance 
+on the Atari57 benchmark. \cite{PPOPaper}
+The first change is to introduce value function annealing to the algorithm, as it has 
+been shown to do better exploitation in late-game usage [CITE]. The second is to 
+introduce a Long Short Term Memory (LSTM) model to replace the MLP architecture of 
+the original paper and better leverage the long-term dependencies. [CITE]
+Thirdly, we introduce a replay buffer to try and improve the experience usage and 
+gathering for improving game results in the last episodes. [CITE]
 \end{abstract}
 
 \section{Introduction}
