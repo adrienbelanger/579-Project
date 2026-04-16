@@ -21,8 +21,8 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{csquotes}
-
-\graphicspath{{figures/}}
+\usepackage{verbatim}
+\graphicspath{{./figures/}}
 
 \title{Upgrading Late Exploitation in PPO with Replay Buffers, LSTMs, and Parameter Decay}
 
@@ -41,25 +41,63 @@
 
 \maketitle
 
+
+\begin{comment}
+Adrien: 
+- Abstract
+- Intro
+- Part of methodology: Base Code, base PPO and value-function annealing
+Sumukh: 
+- Background
+- Methodology: PPO with replay buffer
+- Conclusion and future work
+Eric: 
+- PPO with LSTM
+- Experimental results
+\end{comment}
+
 \begin{abstract}
 This project aims to reimplement the paper that introduced Proximal Policy Algorithms 
 (PPO) and target three different modifications aimed at improving late-game performance 
 on the Atari57 benchmark. \cite{PPOPaper}
 The first change is to introduce value function annealing to the algorithm, as it has 
-been shown to do better exploitation in late-game usage [CITE]. The second is to 
+been shown to do better exploitation in late-game usage \cite{andry}. The second is to 
 introduce a Long Short Term Memory (LSTM) model to replace the MLP architecture of 
-the original paper and better leverage the long-term dependencies. [CITE]
+the original paper and better leverage the long-term dependencies. \cite{recurrmodel}
 Thirdly, we introduce a replay buffer to try and improve the experience usage and 
-gathering for improving game results in the last episodes. [CITE]
+gathering for improving game results in the last episodes. \cite{ACERPaper}
 \end{abstract}
 
 \section{Introduction}
+Policy gradient methods have been widely used in deep Reinforcement Learning (RL). Schulman et al.
+introduced in 2017 PPO algorithms as a simple, stable and (eventually) widely-adopted on-policy
+algorithm. \cite{PPOPaper} PPO has been used in Reinforcement Learning from Human Feedback (RLHF) 
+and complex games to motivate importance. \cite{RLHF,dota} In the original PPO paper, late-stage exploitation
+on the Atari benchmark (Figure 1), late stage rewwards are lacking when compared to ACER, while still having overall
+higher avg. episode reward.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{table2.png}
+    \caption{Table 2 from the original PPO paper, presenting the number of games won, averaged over three trials}
+\end{figure}
+
+The main objective of this project is thus: can targeted modifications to PPO 
+close the late stage performance gap between PPO and ACER?
+We chose three modifications as our main focus: value function coefficient annealing inspired by
+insights from Andrychowicz et al. \cite{andry}, LSTM-based architecture to better capture long-term temporal
+dependencies \cite{recurrmodel} and a replay buffer augmentation for better sample reuse \cite{ACERPaper}.
+
+To evaluate performance, we chose the following 6 games: \texttt{Gopher}, \texttt{Video Pinball}, \texttt{UpNDown}, \texttt{Centipede}, \texttt{DemonAttack}, \texttt{BeamRider} and \texttt{Venture} (see annex for original paper scores). They were selected as they presented
+the most drastic difference in performance (with PPO not in first place) between the winning score and PPO's score.
+
+We ran the benchmarks with the parameters from the original paper (see Annex).
 
 
-\section{Background}
+\section{Background} % Sumukh
 
 
-\section{Methodology}
+\section{Methodology} % Mixed
 
 \subsection{Base PPO}
 
@@ -96,5 +134,27 @@ The report was a collaborative effort.
 
 \bibliographystyle{plainnat}
 \bibliography{bibliography}
+
+\vfill \newpage
+
+\subsection*{Annex}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{selected_game_results.png}
+    \caption{Results from running ACER, A2C and PPO on the Atari 57 benchmarks, rewards over the last 100 episodes. Encircled in red are the selected games.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{selected_game_plots.png}
+    \caption{Results from running ACER, A2C and PPO on the Atari 57 benchmarks, presented cumulative rewards over training. Highlighted in red are the selected games.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.5\linewidth]{hyperparameters.png}
+    \caption{Hyperparameters used in the original PPO paper and in our experiments.}
+\end{figure}
 
 \end{document} 
