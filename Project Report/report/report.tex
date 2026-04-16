@@ -24,7 +24,7 @@
 \usepackage{verbatim}
 \graphicspath{{./figures/}}
 
-\title{Upgrading Late Exploitation in PPO with Replay Buffers, LSTMs, and Parameter Decay}
+\title{Upgrading Late-Stage Exploitation in PPO}
 
 \author{%
   Eric Sun \\
@@ -59,21 +59,20 @@ Eric:
 \begin{abstract}
 This project aims to reimplement the paper that introduced Proximal Policy Algorithms 
 (PPO) and target three different modifications aimed at improving late-game performance 
-on the Atari57 benchmark. \cite{PPOPaper}
+on the Atari57 benchmark~\cite{PPOPaper}. 
 The first change is to introduce value function annealing to the algorithm, as it has 
-been shown to do better exploitation in late-game usage \cite{andry}. The second is to 
-introduce a Long Short Term Memory (LSTM) model to replace the MLP architecture of 
-the original paper and better leverage the long-term dependencies. \cite{recurrmodel}
+been shown to do better exploitation in late-game usage~\cite{andry}. The second is to 
+introduce a Long Short Term Memory (LSTM) model to better leverage the long-term dependencies~\cite{recurrmodel}.
 Thirdly, we introduce a replay buffer to try and improve the experience usage and 
-gathering for improving game results in the last episodes. \cite{ACERPaper}
+gathering for improving game results in the 100 last episodes~\cite{ACERPaper}.
 \end{abstract}
 
 \section{Introduction}
-Policy gradient methods have been widely used in deep Reinforcement Learning (RL). Schulman et al.
+Policy gradient methods have been widely used in reinforcement learning. Schulman et al.
 introduced in 2017 PPO algorithms as a simple, stable and (eventually) widely-adopted on-policy
-algorithm. \cite{PPOPaper} PPO has been used in Reinforcement Learning from Human Feedback (RLHF) 
-and complex games to motivate importance. \cite{RLHF,dota} In the original PPO paper, late-stage exploitation
-on the Atari benchmark (Figure 1), late stage rewwards are lacking when compared to ACER, while still having overall
+algorithm~\cite{PPOPaper}. PPO has been used in Reinforcement Learning from Human Feedback (RLHF) 
+and complex games~\cite{RLHF,dota}. In the original PPO paper, late-stage exploitation
+on the Atari benchmark (Figure 1), late stage rewards are lacking when compared to ACER, while still having overall
 higher avg. episode reward.
 
 \begin{figure}[H]
@@ -83,15 +82,15 @@ higher avg. episode reward.
 \end{figure}
 
 The main objective of this project is thus: can targeted modifications to PPO 
-close the late stage performance gap between PPO and ACER?
+diminish lack in performance in the late game training stage?
 We chose three modifications as our main focus: value function coefficient annealing inspired by
-insights from Andrychowicz et al. \cite{andry}, LSTM-based architecture to better capture long-term temporal
-dependencies \cite{recurrmodel} and a replay buffer augmentation for better sample reuse \cite{ACERPaper}.
+insights from Andrychowicz et al.~\cite{andry}, LSTM-based architecture to better capture long-term temporal
+dependencies~\cite{recurrmodel} and a replay buffer augmentation for better sample reuse~\cite{ACERPaper}.
 
-To evaluate performance, we chose the following 6 games: \texttt{Gopher}, \texttt{Video Pinball}, \texttt{UpNDown}, \texttt{Centipede}, \texttt{DemonAttack}, \texttt{BeamRider} and \texttt{Venture} (see annex for original paper scores). They were selected as they presented
+To evaluate performance, we chose the following 6 games: \texttt{Gopher}, \texttt{Video Pinball}, \texttt{UpNDown}, \texttt{Centipede}, \texttt{DemonAttack}, \texttt{BeamRider} and \texttt{Venture} (see annex for original paper scores) as they presented
 the most drastic difference in performance (with PPO not in first place) between the winning score and PPO's score.
 
-We ran the benchmarks with the parameters from the original paper (see Annex).
+We ran the benchmarks with the parameters from the original paper (see Annex 3).
 
 
 \section{Background} % Sumukh
@@ -99,9 +98,71 @@ We ran the benchmarks with the parameters from the original paper (see Annex).
 
 \section{Methodology} % Mixed
 
-\subsection{Base PPO}
+\subsection{General Code structure} % Adrien
 
-\subsection{PPO with value-function annealing}
+The code is organized into five main parts.
+\texttt{game.py} takes care of creating the Atari environments 
+via ALE/Gymnasium v5 and validates game names against the Atari 
+57 game list from the original paper ~\cite{PPOPaper}.
+\texttt{config.py} creates dataclasses (\texttt{EnvConfig}, 
+\texttt{ActorCriticConfig}, \texttt{PPOConfig}, \texttt{BenchmarkConfig}) 
+so that all hyperparameters are declared in one place.
+\texttt{model.py} contains the \texttt{ActorCritic} network and 
+the \texttt{PPOModel} training loop, while \texttt{agent.py} 
+provides a \texttt{PPOAgent} whose \texttt{train} method 
+creates a model and then then takes care of rollout.
+Each experimental variant is implemented as a subclass of 
+\texttt{PPOAgent}/\texttt{PPOModel}, overriding only the parts 
+that change for their respective target modification. 
+This was implemented to make it as easy to read
+for an external user, and as modular as possible so you could 
+add models in the future.
+
+Next, the observation Pipeline.
+We configure with \texttt{frameskip=1} and 
+\texttt{repeat\_action\_probability=0.25} all as in the original paper.
+We also do \texttt{MaxAndSkipObservation(4)}, which pools over 
+frames and produces a 4$\times$ frame skip (as in the original paper). 
+We use the 
+\texttt{ResizeObservation(84$\times$84)}; \texttt{GrayscaleObservation};
+ and \texttt{FrameStackObservation(4)}.
+
+As in the benchmarks results leading to the annexed paper, 
+benchmarking for the project is performed over 3 random seeds 
+per game.
+Episode returns are saved at the end of the episode and 
+plotted as learning curves over game frames for better 
+comparison with the original paper's results. The final 
+reported score is the mean episode return over the last 
+100 episodes, again like table 6 from the PPO paper~\cite{PPOPaper}.
+
+\subsection{Base PPO} % Adrien
+
+Our loss function follows the original paper~\cite{PPOPaper}:
+$$L(\theta) = L^{\text{CLIP}}(\theta) - c_1 L^{\text{VF}}(\theta) + c_2 H[\pi_\theta]$$
+where $\varepsilon=0.1$, $c_1=1.0$, $c_2=0.01$, and both the 
+learning rate (lr) and clipping parameter are being annealed (see annex 3 for full parameters).
+
+The actor-critic setup follows Mnih et al.~\cite{mnih2015} (like the PPO paper does ~\cite{PPOPaper}): 
+two convolutional layers with separate heads for the actor and the critic.
+
+Training collects 128 steps across 8 parallel actors for each 
+update. Then, it computes GAE advantages.
+Then, it runs 3 epochs of minibatch SGD with 
+Adam optimization.
+
+\subsection{PPO with value-function annealing} % Adrien
+
+In base PPO, our $c_1$ param is fixed throughout training. 
+Andrychowicz et al.~\cite{andry} showed that 
+the value loss weighting significantly affects on-policy performance. Thus, we implement this change in hopes of getting better late-stage performance. 
+We decay $c_1$ from 1.0 to 0.1 over the full training run:
+$$c_1(t) = c_1^{\text{end}} + (c_1^{\text{start}} - c_1^{\text{end}}) \times \alpha$$ 
+where $\alpha = 1 - \frac{\text{update}_i}{\text{total\_updates}}$.
+We implemented this by creating a subclass of \texttt{PPOModel} and overriding 
+a single \texttt{\_current\_value\_coeff()} hook (implemented to simplify this approach in the first place); all other 
+components remain identical 
+to the base for better comparison.
 
 \subsection{PPO with an LSTM architecture}
 
@@ -133,7 +194,7 @@ The report was also split:
 \end{itemize}
 
 \paragraph{Acknowledgements}
-
+a
 
 \vfill \newpage
 
@@ -143,6 +204,10 @@ The report was also split:
 \vfill \newpage
 
 \subsection*{Annex}
+
+\setcounter{figure}{0}
+\renewcommand{\figurename}{Annex}
+\renewcommand{\thefigure}{\arabic{figure}}
 
 \begin{figure}[H]
     \centering
