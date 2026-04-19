@@ -64,3 +64,10 @@ class PPOConfig_VF_Annealing(PPOConfig):
     anneal_value_coeff: bool = True
     initial_val_coeff: float = 1.0
     final_val_coeff: float = 0.1
+
+@dataclass(frozen=True)
+class PPOConfig_ReplayBuffer(PPOConfig):
+    replay_capacity_updates: int = 4
+    replay_start_after_updates: int = 2
+    replay_minibatches_per_update: int = 2
+    replay_max_age_updates: int = 2

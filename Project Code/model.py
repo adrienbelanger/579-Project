@@ -24,6 +24,30 @@ class EpisodePoint:
     episode_return: float
 
 
+
+@dataclass(frozen=True)
+class ReplayBatch:
+    observations: torch.Tensor
+    returns: torch.Tensor
+    update_i: int
+
+
+class ReplayBuffer:
+    def __init__(self, capacity_updates: int) -> None:
+        self.capacity_updates = capacity_updates
+        self.storage: list[ReplayBatch] = []
+
+    def add(self, batch: ReplayBatch) -> None:
+        self.storage.append(batch)
+        if len(self.storage) > self.capacity_updates:
+            self.storage.pop(0)
+
+    def recent_batches(self, current_update_i: int, max_age_updates: int) -> list[ReplayBatch]:
+        return [
+            batch for batch in self.storage
+            if (current_update_i - batch.update_i) <= max_age_updates
+        ]
+
 class ActorCritic(Model, nn.Module):
     """Paper CNN actor-critic with orthogonal initialization."""
 
@@ -123,7 +147,7 @@ class PPOModel(Model):
         total_timesteps = 0
         episode_points: list[EpisodePoint] = []
         self.network.train()
-        for update_i in tqdm(range(updates), desc="      Training", unit="update"):
+        for update_i in tqdm(range(updates) , desc="      Training", unit="update"):
             alpha = 1.0 - (update_i / updates)
             lr = self.cfg.learning_rate * alpha if self.cfg.anneal_learning_rate else self.cfg.learning_rate # if we don't want to anneal we can retest
             clip = self.cfg.clipping * alpha if self.cfg.anneal_clipping else self.cfg.clipping
@@ -261,3 +285,116 @@ class PPOModel_VF_Annealing(PPOModel):
         final = config.PPOConfig_VF_Annealing.final_val_coeff
         alpha = 1.0 - (update_i / updates)
         return float(final + (initial - final) * alpha)
+
+
+class PPOModel_ReplayBuffer(PPOModel):
+    def __init__(self, action_dim: int) -> None:
+        super().__init__(action_dim=action_dim)
+        self.cfg = config.PPOConfig_ReplayBuffer()
+        self.optimizer = torch.optim.Adam(
+            self.network.parameters(),
+            lr=self.cfg.learning_rate,
+            eps=self.cfg.adam_eps,
+        )
+        self.replay_buffer = ReplayBuffer(self.cfg.replay_capacity_updates)
+
+    def _store_replay_batch(
+        self,
+        observations: torch.Tensor,
+        returns: torch.Tensor,
+        update_i: int,
+    ) -> None:
+        # store on CPU to keep replay cheap in memory
+        flat_obs = observations.flatten(0, 1).detach().cpu().to(torch.uint8)
+        flat_ret = returns.detach().cpu()
+
+        self.replay_buffer.add(
+            ReplayBatch(
+                observations=flat_obs,
+                returns=flat_ret,
+                update_i=update_i,
+            )
+        )
+
+    def _replay_value_update(self, current_update_i: int, value_coeff: float) -> None:
+        if (current_update_i + 1) < self.cfg.replay_start_after_updates:
+            return
+
+        batches = self.replay_buffer.recent_batches(
+            current_update_i=current_update_i,
+            max_age_updates=self.cfg.replay_max_age_updates,
+        )
+        if not batches:
+            return
+
+        pooled_obs = torch.cat([batch.observations for batch in batches], dim=0)
+        pooled_ret = torch.cat([batch.returns for batch in batches], dim=0)
+
+        total = pooled_obs.shape[0]
+        if total == 0:
+            return
+
+        sample_size = min(self.cfg.minibatch_size, total)
+
+        for _ in range(self.cfg.replay_minibatches_per_update):
+            idx = torch.randint(0, total, (sample_size,))
+            obs_batch = pooled_obs[idx]
+            ret_batch = pooled_ret[idx].to(self.device)
+
+            _, values = self.network(obs_batch)
+            v_loss = (values - ret_batch).pow(2).mean()
+
+            self.optimizer.zero_grad()
+            (value_coeff * v_loss).backward()
+            nn.utils.clip_grad_norm_(self.network.parameters(), self.cfg.max_grad_norm)
+            self.optimizer.step()
+
+    def train(self, env: gym.vector.VectorEnv, seed: int) -> list[EpisodePoint]:
+        N, T = self.cfg.actors, self.cfg.horizon
+        updates = self.cfg.total_timesteps // (N * T)
+        if updates <= 0:
+            raise ValueError(
+                f"PPOConfig.total_timesteps must be more than actors * horizon "
+                f"(here higher than {self.cfg.actors * self.cfg.horizon})."
+            )
+
+        run_seed = seed
+
+        obs, _ = env.reset(seed=run_seed)
+        episode_returns = np.zeros(N, dtype=np.float32)
+        total_timesteps = 0
+        episode_points: list[EpisodePoint] = []
+        self.network.train()
+
+        for update_i in tqdm(range(updates), desc="      Training", unit="update"):
+            alpha = 1.0 - (update_i / updates)
+            lr = self.cfg.learning_rate * alpha if self.cfg.anneal_learning_rate else self.cfg.learning_rate
+            clip = self.cfg.clipping * alpha if self.cfg.anneal_clipping else self.cfg.clipping
+            value_coeff = self._current_value_coeff(update_i, updates)
+
+            for group in self.optimizer.param_groups:
+                group["lr"] = lr
+
+            O, A, R, D, LP, V, obs, episode_returns, total_timesteps, new_points = self._rollout(
+                env,
+                obs,
+                episode_returns,
+                total_timesteps,
+            )
+            episode_points.extend(new_points)
+
+            with torch.no_grad():
+                _, next_v = self.network(obs)
+
+            adv, ret = self._gae(R, D, V, next_v)
+
+            # normal on-policy PPO update
+            self._update(O, A, LP, adv, ret, clip, value_coeff)
+
+            # extra critic replay update from recent batches
+            self._store_replay_batch(O, ret, update_i)
+            self._replay_value_update(update_i, value_coeff)
+
+        self.network.eval()
+        self._trained = True
+        return episode_points

@@ -5,7 +5,8 @@ import numpy as np
 
 import config
 from game import Game
-from model import EpisodePoint, Model, PPOModel, PPOModel_VF_Annealing
+from model import EpisodePoint, Model, PPOModel, PPOModel_VF_Annealing, PPOModel_ReplayBuffer
+
 '''
 Here is where we can declare each of our agents.
 I've set up a random agent for good measure. (which is now deprecated)
@@ -134,3 +135,15 @@ class PPOAgent_VF_Annealing(PPOAgent):
 
     def _build_model(self, action_dim: int) -> PPOModel_VF_Annealing:
         return PPOModel_VF_Annealing(action_dim=action_dim)
+
+
+class PPOAgent_ReplayBuffer(PPOAgent):
+    def __init__(self) -> None:
+        self.ppo_cfg = config.PPOConfig_ReplayBuffer()
+        self.stochastic_eval = True
+        self.model: PPOModel_ReplayBuffer | None = None
+        self._trained = False
+        self._trained_game: str | None = None
+
+    def _build_model(self, action_dim: int) -> PPOModel_ReplayBuffer:
+        return PPOModel_ReplayBuffer(action_dim=action_dim)
