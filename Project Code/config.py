@@ -71,3 +71,13 @@ class PPOConfig_ReplayBuffer(PPOConfig):
     replay_start_after_updates: int = 2
     replay_minibatches_per_update: int = 2
     replay_max_age_updates: int = 2
+
+@dataclass(frozen=True)
+class PPOConfig_LSTM(PPOConfig):
+    """
+    Same hyper-parameters as the base PPO config.
+    Could add more here if needed later (e.g. lstm_layers, lstm_hidden_size, sequence_len).
+    """
+    lstm_hidden_size: int = 256   # must match ActorCriticConfig.hidden_size
+    lstm_layers: int = 1
+
