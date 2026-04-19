@@ -139,7 +139,7 @@ def _train_one(args: tuple) -> seedResult:
 
 
 
-def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> None:
+def run_benchmark(agents: list[Agent], games_list: list[str] | None, outdir: str | None) -> None:
     if games_list == None:
         games = make_games(VALID_GAMES)
     else:
@@ -164,9 +164,9 @@ def run_benchmark(agents: list[Agent], games_list: list[str] | None) -> None:
             game_result = GameResult(agent, game, seed_results)
             game_results.append(game_result)
 
-    plot_results(game_results)
-    plot_final_scores_table(game_results)
-def plot_results(game_results: list[GameResult])-> None:
+    plot_results(game_results, outdir)
+    plot_final_scores_table(game_results, outdir)
+def plot_results(game_results: list[GameResult], outdir: str | None)-> None:
     """
     Plot PPO learning curves. One color per agent, one line per seed.
     
@@ -234,10 +234,15 @@ def plot_results(game_results: list[GameResult])-> None:
     fig.legend(handles=legend_elements, loc='upper right', fontsize=10)
     
     plt.tight_layout()
-    plt.show()
+    if outdir is not None:
+        os.makedirs(outdir, exist_ok=True)
+        plt.savefig(f"{outdir}/learning_curve.png")
+        plt.close()
+    else:
+        plt.show()
 
 
-def plot_final_scores_table(game_results: list[GameResult]) -> None:
+def plot_final_scores_table(game_results: list[GameResult], outdir: str | None) -> None:
     """
     Plot a table of final scores, like table 6 in the original paper
     """
@@ -287,4 +292,9 @@ def plot_final_scores_table(game_results: list[GameResult]) -> None:
     table.scale(1, 1.2)
 
     plt.tight_layout()
-    plt.show()
+    if outdir is not None:
+        os.makedirs(outdir, exist_ok=True)
+        plt.savefig(f"{outdir}/score_table.png")
+        plt.close()
+    else:
+        plt.show()
