@@ -236,7 +236,7 @@ def plot_results(game_results: list[GameResult], outdir: str | None)-> None:
     plt.tight_layout()
     if outdir is not None:
         os.makedirs(outdir, exist_ok=True)
-        plt.savefig(f"{outdir}/learning_curve.png")
+        plt.savefig(os.path.join(outdir, "learning_curve.png"))
         plt.close()
     else:
         plt.show()
@@ -294,7 +294,7 @@ def plot_final_scores_table(game_results: list[GameResult], outdir: str | None) 
     plt.tight_layout()
     if outdir is not None:
         os.makedirs(outdir, exist_ok=True)
-        plt.savefig(f"{outdir}/score_table.png")
+        plt.savefig(os.path.join(outdir, "score_table.png"))
         plt.close()
     else:
         plt.show()
