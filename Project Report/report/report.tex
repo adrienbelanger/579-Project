@@ -176,47 +176,6 @@ During policy updates, we treat each of the $N = 8$ actors as an independent seq
 \section{Experimental Results}
 Table 1 reports the mean episode return over the last 100 training episodes, averaged across three seeds, for our four variants and the published PPO, A2C, and ACER baselines \cite{PPOPaper,ACERPaper}.
 
-Across most games, our implementations fall short of the paper's reported numbers, reflecting the gap between optimized hyperparameters and our constrained setup. Among our PPO variants, \textbf{VF Annealing} is the strongest overall: it improves on the base PPO on five of six games and yields a dramatic gain on UpNDown ($+155\%$), suggesting that gradually reducing the emphasis on value estimation helps the policy stabilize in later training. The \textbf{Replay Buffer} variant offers a moderate boost on DemonAttack but otherwise performs comparably to or below the baseline, indicating that the off-policy critic updates do not reliably transfer across all game dynamics. The \textbf{LSTM} variant underperforms on most games, likely because the LSTM's sequential update scheme is significantly slower per update (roughly $8\times$ in our measurements), preventing sufficient training within the fixed timestep budget. Notably, LSTM achieves the highest score on VideoPinball ($20\,020$, exceeding both A2C and our base PPO), hinting that its recurrent memory is genuinely useful in games with long-range structure.
-
-\section{Conclusion and Future Work}
-
-
-\section{Contributions and Acknowledgements}
-
-\paragraph{Contributions}
-The code was separated in three key parts:
-\begin{itemize}
-  \item Adrien took care of the benchmarking, base PPO implementation and value-function annealing implementation
-  \item Eric took care of the LSTM agent and running the benchmarks
-  \item Sumukh took care of implementing the replay buffer agent
-\end{itemize}
-
-The report was also split:
-\begin{itemize}
-  \item Adrien wrote the Abstract, Introduction, and the parts of the methodology regarding the general code, base PPO implementation and value-function annealing implementation
-  \item Eric wrote the part of the methodology regarding the LSTM agent and the Experimental Results
-  \item Sumukh wrote the background, the part of the methodology regarding the replay buffer agent and the Conclusion
-\end{itemize}
-
-\paragraph{Acknowledgements}
-a
-
-\vfill \newpage
-
-\bibliographystyle{plainnat}
-\bibliography{bibliography}
-
-\vfill \newpage
-
-\subsection*{Annex}
-
-
-
-
-\setcounter{figure}{1} 
-\renewcommand{\figurename}{Annex}
-\renewcommand{\thefigure}{\arabic{figure}}
-\renewcommand{\tablename}{Annex}
 \begin{table}[H]
     \centering
     \caption{\footnotesize{Mean Final Scores (Last 100 Episodes) - Bolding: Black, highest score among our implementations, red - highest score including paper}}
@@ -244,10 +203,49 @@ a
     }
 \end{table}
 
+Across most games, our implementations fall short of the paper's reported numbers, reflecting the gap between optimized hyperparameters and our constrained setup. Among our PPO variants, \textbf{VF Annealing} is the strongest overall: it improves on the base PPO on five of six games and yields a dramatic gain on UpNDown ($+155\%$), suggesting that gradually reducing the emphasis on value estimation helps the policy stabilize in later training. The \textbf{Replay Buffer} variant offers a moderate boost on DemonAttack but otherwise performs comparably to or below the baseline, indicating that the off-policy critic updates do not reliably transfer across all game dynamics. The \textbf{LSTM} variant underperforms on most games, likely because the LSTM's sequential update scheme is significantly slower per update (roughly $8\times$ in our measurements), preventing sufficient training within the fixed timestep budget. Notably, LSTM achieves the highest score on VideoPinball ($20\,020$, exceeding both A2C and our base PPO), hinting that its recurrent memory is genuinely useful in games with long-range structure.
+
+\section{Conclusion and Future Work}
+
+
+\section{Contributions}
+
+The code was separated in three key parts:
+\begin{itemize}
+  \item Adrien took care of the benchmarking, base PPO implementation and value-function annealing implementation
+  \item Eric took care of the LSTM agent and running the benchmarks
+  \item Sumukh took care of implementing the replay buffer agent
+\end{itemize}
+
+The report was also split:
+\begin{itemize}
+  \item Adrien wrote the Abstract, Introduction, and the parts of the methodology regarding the general code, base PPO implementation and value-function annealing implementation
+  \item Eric wrote the part of the methodology regarding the LSTM agent and the Experimental Results
+  \item Sumukh wrote the background, the part of the methodology regarding the replay buffer agent and the Conclusion
+\end{itemize}
+
+\vfill \newpage
+
+\bibliographystyle{plainnat}
+\bibliography{bibliography}
+
+\vfill \newpage
+
+\subsection*{Annex}
+
+
+
+
+\setcounter{figure}{0} 
+\renewcommand{\figurename}{Annex}
+\renewcommand{\thefigure}{\arabic{figure}}
+\renewcommand{\tablename}{Annex}
+
+
 
 \begin{figure}[H] 
     \centering
-    \includegraphics[width=0.6\linewidth]{selected_game_results.png}
+    \includegraphics[width=0.7\linewidth]{selected_game_results.png}
     \caption{Results from running ACER, A2C and PPO on the Atari 57 benchmarks, rewards over the last 100 episodes. Encircled in red are the selected games.}
 \end{figure}
 
