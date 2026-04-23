@@ -87,7 +87,7 @@ We chose three modifications as our main focus: value function coefficient annea
 insights from Andrychowicz et al.~\cite{andry}, LSTM-based architecture to better capture long-term temporal
 dependencies~\cite{recurrmodel} and a replay buffer augmentation for better sample reuse~\cite{ACERPaper}.
 
-To evaluate performance, we chose the following 6 games: \texttt{Gopher}, \texttt{Video Pinball}, \texttt{UpNDown}, \texttt{Centipede}, \texttt{DemonAttack}, \texttt{BeamRider} and \texttt{Venture} (see annex for original paper scores) as they presented
+To evaluate performance, we chose the following 6 games: \texttt{Alien}, \texttt{Centipede}, \texttt{DemonAttack}, \texttt{Gopher}, \texttt{UpNDown}, and \texttt{VideoPinball} (see annex for original paper scores) as they presented
 the most drastic difference in performance (with PPO not in first place) between the winning score and PPO's score.
 
 We ran the benchmarks with the parameters from the original paper (see Annex 3).
@@ -143,8 +143,7 @@ $$L(\theta) = L^{\text{CLIP}}(\theta) - c_1 L^{\text{VF}}(\theta) + c_2 H[\pi_\t
 where $\varepsilon=0.1$, $c_1=1.0$, $c_2=0.01$, and both the 
 learning rate (lr) and clipping parameter are being annealed (see annex 3 for full parameters).
 
-The actor-critic setup follows Mnih et al.~\cite{mnih2015} (like the PPO paper does ~\cite{PPOPaper}): 
-two convolutional layers with separate heads for the actor and the critic.
+We implement a lightweight actor-critic setup: two convolutional layers with separate heads for the actor and the critic, following the 2013 DQN architecture (rather than the three-layer Nature CNN~\cite{mnih2015} used in the original PPO paper~\cite{PPOPaper}).
 
 Training collects 128 steps across 8 parallel actors for each 
 update. Then, it computes GAE advantages.
