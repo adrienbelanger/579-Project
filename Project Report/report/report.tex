@@ -205,13 +205,44 @@ a
 
 \subsection*{Annex}
 
-\setcounter{figure}{0} 
+
+
+
+\setcounter{figure}{1} 
 \renewcommand{\figurename}{Annex}
 \renewcommand{\thefigure}{\arabic{figure}}
-
-\begin{figure}[H]
+\renewcommand{\tablename}{Annex}
+\begin{table}[H]
     \centering
-    \includegraphics[width=0.7\linewidth]{selected_game_results.png}
+    \caption{\footnotesize{Mean Final Scores (Last 100 Episodes) - Bolding: Black, highest score among our implementations, red - highest score including paper}}
+    \label{tab:results}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        \textbf{Game}
+            & \textbf{PPO Agent - Base}
+            & \textbf{PPO Agent - VF Annealing}
+            & \textbf{PPO Agent - ReplayBuffer}
+            & \textbf{PPO Agent - LSTM}
+            & \textbf{Paper PPO}
+            & \textbf{Paper A2C}
+            & \textbf{Paper ACER} \\
+        \midrule
+        Alien        & 487.8   & \textbf{555.9}  & 424.9   & 301.0   & \textcolor{red}{\textbf{1850.3}} & 1141.7   & 1655.4    \\
+        Centipede    & 6258.4  & \textbf{6536.5} & 4807.4  & 3311.5  & 4386.4   & 3496.5   & \textcolor{red}{\textbf{8904.8}}   \\
+        DemonAttack  & 392.2   & 415.0   & \textbf{543.4}  & 174.3   & 11378.4  & 6639.1   & \textcolor{red}{\textbf{38808.3}}  \\
+        Gopher       & 802.8   & \textbf{1030.5} & 783.1   & 528.1   & 2932.9   & 1500.9   & \textcolor{red}{\textbf{37802.3}}  \\
+        UpNDown      & 3167.0  & \textbf{8093.4} & 2835.0  & 1934.5  & 95445.0  & 17369.8  & \textcolor{red}{\textbf{145051.4}} \\
+        VideoPinball & 8231.8  & 6472.4  & 6582.4  & \textbf{20020.0} & 37389.0  & 19735.9  & \textcolor{red}{\textbf{156225.6}} \\
+        \bottomrule
+    \end{tabular}%
+    }
+\end{table}
+
+
+\begin{figure}[H] 
+    \centering
+    \includegraphics[width=0.6\linewidth]{selected_game_results.png}
     \caption{Results from running ACER, A2C and PPO on the Atari 57 benchmarks, rewards over the last 100 episodes. Encircled in red are the selected games.}
 \end{figure}
 
@@ -226,5 +257,7 @@ a
     \includegraphics[width=0.5\linewidth]{hyperparameters.png}
     \caption{Hyperparameters used in the original PPO paper and in our experiments.}
 \end{figure}
+
+
 
 \end{document} 
